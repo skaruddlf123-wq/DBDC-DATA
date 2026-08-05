@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 한국투자증권 브랜드 스타일 정의 (브라운 #7A4016, 블루 #0066B3, 웜화이트 #F9F8F6)
+# 한국투자증권 브랜드 스타일 정의
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
@@ -101,6 +101,15 @@ st.markdown("""
         font-size: 0.80rem;
         color: #777777;
     }
+    
+    .welcome-card {
+        background-color: #ffffff;
+        border: 1px solid #E5E0DA;
+        border-radius: 8px;
+        padding: 30px;
+        margin-top: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -126,7 +135,7 @@ def get_company_list():
 COMPANY_LIST = get_company_list()
 
 # -----------------------------------------------------------------------------
-# 3. 데이터 로딩 및 파싱 함수 (주민번호 성별코드 파싱 오류 수정)
+# 3. 데이터 로딩 및 파싱 함수 (성별 파싱 로직 수정)
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=3600)
 def load_company_data(company_name):
@@ -157,12 +166,13 @@ def load_company_data(company_name):
     except:
         peak_age = 55
         
-    # [오류 수정] 주민등록번호 성별 코드를 정확히 하이픈 뒤 첫 번째 자리에서 추출
+    # 주민등록번호 성별 파싱 정확한 로직 (하이픈 뒤 첫 번째 자리)
     def parse_rrn(rrn_val):
         rrn_str = str(rrn_val).strip()
         yy = int(rrn_str[:2])
         if '-' in rrn_str:
-            g = rrn_str.split('-')[0]  # 하이픈 뒤 첫 번째 자리가 성별코드 (1, 2, 3, 4)
+            parts = rrn_str.split('-')
+            g = parts[0] if len(parts) > 1 and len(parts) > 0 else '1'
         else:
             g = rrn_str if len(rrn_str) > 6 else '1'
             
@@ -212,7 +222,7 @@ def get_all_companies_summary():
     return sum_df
 
 # -----------------------------------------------------------------------------
-# 4. 사이드바 및 헤더 (상단 로고 내장)
+# 4. 사이드바 및 초기 대기 화면 설정
 # -----------------------------------------------------------------------------
 st.sidebar.title("🎯 영업 Target 대시보드")
 st.sidebar.markdown("**한국투자증권 퇴직연금본부**")
@@ -222,23 +232,17 @@ main_menu = st.sidebar.radio("메뉴 선택", ["1. 개별 기업 상세 분석",
 # 페이지 1: 개별 기업 상세 분석
 # =============================================================================
 if main_menu == "1. 개별 기업 상세 분석":
-    selected_company = st.sidebar.selectbox("🏢 기업 선택", COMPANY_LIST, index=0)
+    # 초기 대기 옵션
+    select_options = ["-- 기업을 선택하세요 --"] + COMPANY_LIST
+    selected_company = st.sidebar.selectbox("🏢 기업 선택", select_options, index=0)
     
-    with st.spinner(f"{selected_company} 데이터를 분석 중입니다..."):
-        df = load_company_data(selected_company)
-        all_sum_df = get_all_companies_summary()
-        
-    if df is not None and all_sum_df is not None:
-        peak_age = df.iloc[0]['임금피크연령']
-        target_min_age = peak_age - 2
-        target_max_age = 59
-        
-        # 한국투자증권 전용 상단 헤더
-        st.markdown(f"""
+    if selected_company == "-- 기업을 선택하세요 --":
+        # 초기 대기 화면 (Landing Screen)
+        st.markdown("""
         <div class="header-container">
             <div>
-                <div class="header-title">🏢 {selected_company} DB 가입자 명부 분석 및 영업 Target 명단</div>
-                <div class="header-subtitle">기준일자: 2025-07-31 (현시점 2026-07-31 기준) | 설정 임금피크 연령: 만 {peak_age}세 | 분석 대상: 만 {target_min_age}세 ~ 만 {target_max_age}세</div>
+                <div class="header-title">📈 한국투자증권 DB 가입자 명부 분석 대시보드</div>
+                <div class="header-subtitle">퇴직연금 영업 Target 도출 및 1:1 커스텀 마케팅 솔루션</div>
             </div>
             <div class="kis-logo-text">
                 <div class="kis-brand-friend">true <span>友</span> friend</div>
@@ -248,152 +252,189 @@ if main_menu == "1. 개별 기업 상세 분석":
         </div>
         """, unsafe_allow_html=True)
         
-        active_df = df[df['기퇴직자 여부'] == 'N'].copy()
+        st.markdown("""
+        <div class="welcome-card">
+            <h3 style="color:#7A4016; margin-top:0;">👋 반갑습니다! 분석할 기업을 선택해 주세요.</h3>
+            <p style="font-size:1.05rem; color:#444444; line-height:1.6;">
+                좌측 사이드바의 <b>[🏢 기업 선택]</b> 드롭다운 메뉴에서 분석하고자 하는 기업(A사~AX사)을 선택하시면, 
+                해당 기업의 DB 가입자 명부 데이터 및 <b>임금피크 도래 대상자 영업 명단</b>이 자동으로 집계되어 표출됩니다.
+            </p>
+            <hr style="border:0; border-top:1px solid #E5E0DA; margin:20px 0;">
+            <h4 style="color:#333333;">💡 제공하는 주요 분석 기능</h4>
+            <ul style="color:#555555; line-height:1.8;">
+                <li><b>임금피크 진입 연도별 도래 캘린더</b>: 만 나이 기준 (임금피크 연령 -2세 ~ 만 59세) 근로자의 시점별 진입 인원 및 추계액 합산 현황</li>
+                <li><b>영업 Target 상세 명단</b>: 추계액 내림차순 정렬 및 마케팅/TM/SMS 동의 여부 수록</li>
+                <li><b>50개사 벤치마킹 비교</b>: 기업별 대상 구간 비중 및 전체 50개사 평균 비교</li>
+                <li><b>우선 영업 Target 순위 LIST UP</b>: 근로자수, 합산추계액, 평균추계액, 대상구간비중 기준 1위~50위 정렬</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # [지표 3] 대상 구간 가입자 비중 타이틀 및 전체 50개사 평균 비교
-        comp_summary = all_sum_df[all_sum_df['기업명'] == selected_company].iloc[0]
-        comp_target_ratio = comp_summary['대상구간가입자비중']
-        avg_target_ratio_50 = all_sum_df['대상구간가입자비중'].mean()
-        
-        st.markdown(f"### 📌 대상 구간 가입자 비중 : **<span style='color:#7A4016;'>{selected_company} : {comp_target_ratio:.1f}%</span> / 전체(50개사 평균) : {avg_target_ratio_50:.1f}%**", unsafe_allow_html=True)
-        st.markdown("---")
-        
-        # [지표 2 상단 KPI]
-        tot_cnt = comp_summary['전체가입자수']
-        tot_ob = comp_summary['전체합산추계액']
-        avg_ob = comp_summary['전체평균추계액']
-        target_cnt = comp_summary['대상구간근로자수']
-        target_avg_ob = comp_summary['대상구간평균추계액']
-        
-        kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
-        
-        with kpi_col1:
+    else:
+        with st.spinner(f"{selected_company} 데이터를 분석 중입니다..."):
+            df = load_company_data(selected_company)
+            all_sum_df = get_all_companies_summary()
+            
+        if df is not None and all_sum_df is not None:
+            peak_age = df.iloc[0]['임금피크연령']
+            target_min_age = peak_age - 2
+            target_max_age = 59
+            
             st.markdown(f"""
-            <div class="metric-card">
-                <div class="kpi-title">전체 가입자 수</div>
-                <div class="kpi-value">{tot_cnt:,} 명</div>
-                <div class="kpi-sub">재직자 기준</div>
+            <div class="header-container">
+                <div>
+                    <div class="header-title">🏢 {selected_company} DB 가입자 명부 분석 및 영업 Target 명단</div>
+                    <div class="header-subtitle">기준일자: 2025-07-31 (현시점 2026-07-31 기준) | 설정 임금피크 연령: 만 {peak_age}세 | 분석 대상: 만 {target_min_age}세 ~ 만 {target_max_age}세</div>
+                </div>
+                <div class="kis-logo-text">
+                    <div class="kis-brand-friend">true <span>友</span> friend</div>
+                    <div class="kis-brand-name">Korea Investment</div>
+                    <div class="kis-brand-sub">& Securities Co., Ltd.</div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
-        with kpi_col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="kpi-title">전체 가입자 합산 추계액</div>
-                <div class="kpi-value">₩{tot_ob/100000000:,.1f} 억</div>
-                <div class="kpi-sub">총 퇴직부채 규모</div>
-            </div>
-            """, unsafe_allow_html=True)
+            active_df = df[df['기퇴직자 여부'] == 'N'].copy()
             
-        with kpi_col3:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="kpi-title">전체 가입자 평균 추계액</div>
-                <div class="kpi-value">₩{avg_ob/10000:,.0f} 만원</div>
-                <div class="kpi-sub">1인당 평균 퇴직금</div>
-            </div>
-            """, unsafe_allow_html=True)
+            comp_summary = all_sum_df[all_sum_df['기업명'] == selected_company].iloc[0]
+            comp_target_ratio = comp_summary['대상구간가입자비중']
+            avg_target_ratio_50 = all_sum_df['대상구간가입자비중'].mean()
+            
+            st.markdown(f"### 📌 대상 구간 가입자 비중 : **<span style='color:#7A4016;'>{selected_company} : {comp_target_ratio:.1f}%</span> / 전체(50개사 평균) : {avg_target_ratio_50:.1f}%**", unsafe_allow_html=True)
+            st.markdown("---")
+            
+            tot_cnt = comp_summary['전체가입자수']
+            tot_ob = comp_summary['전체합산추계액']
+            avg_ob = comp_summary['전체평균추계액']
+            target_cnt = comp_summary['대상구간근로자수']
+            target_avg_ob = comp_summary['대상구간평균추계액']
+            
+            kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+            
+            with kpi_col1:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="kpi-title">전체 가입자 수</div>
+                    <div class="kpi-value">{tot_cnt:,} 명</div>
+                    <div class="kpi-sub">재직자 기준</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            with kpi_col2:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="kpi-title">전체 가입자 합산 추계액</div>
+                    <div class="kpi-value">₩{tot_ob/100000000:,.1f} 억</div>
+                    <div class="kpi-sub">총 퇴직부채 규모</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            with kpi_col3:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="kpi-title">전체 가입자 평균 추계액</div>
+                    <div class="kpi-value">₩{avg_ob/10000:,.0f} 만원</div>
+                    <div class="kpi-sub">1인당 평균 퇴직금</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-        with kpi_col4:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="kpi-title">대상 구간(만 {target_min_age}~{target_max_age}세) 인원</div>
-                <div class="kpi-value">{target_cnt:,} 명</div>
-                <div class="kpi-sub">대상구간 평균: ₩{target_avg_ob/10000:,.0f}만원</div>
-            </div>
-            """, unsafe_allow_html=True)
+            with kpi_col4:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="kpi-title">대상 구간(만 {target_min_age}~{target_max_age}세) 인원</div>
+                    <div class="kpi-value">{target_cnt:,} 명</div>
+                    <div class="kpi-sub">대상구간 평균: ₩{target_avg_ob/10000:,.0f}만원</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("---")
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("---")
 
-        # [지표 1] 연도별 도래 캘린더
-        st.subheader(f"📅 1. 임금피크 진입 연도별 도래 캘린더 (만 {target_min_age}세 ~ 만 {target_max_age}세)")
-        st.caption("언제(몇 년도 / 몇 년 후), 총 몇 명이 임금피크에 진입하는지 시점별 인원 및 추계액 합산 현황입니다.")
-        
-        target_df = active_df[(active_df['만나이'] >= target_min_age) & (active_df['만나이'] <= target_max_age)].copy()
-        
-        def calc_peak_entry(birth_year, p_age):
-            peak_year = birth_year + p_age
-            years_left = peak_year - 2026
-            if years_left <= 0:
-                status_str = "임금피크 해당자"
-            else:
-                status_str = f"{years_left}년 후 임금피크 도래자"
-            return status_str, peak_year, years_left
+            st.subheader(f"📅 1. 임금피크 진입 연도별 도래 캘린더 (만 {target_min_age}세 ~ 만 {target_max_age}세)")
+            st.caption("언제(몇 년도 / 몇 년 후), 총 몇 명이 임금피크에 진입하는지 시점별 인원 및 추계액 합산 현황입니다.")
+            
+            target_df = active_df[(active_df['만나이'] >= target_min_age) & (active_df['만나이'] <= target_max_age)].copy()
+            
+            def calc_peak_entry(birth_year, p_age):
+                peak_year = birth_year + p_age
+                years_left = peak_year - 2026
+                if years_left <= 0:
+                    status_str = "임금피크 해당자"
+                else:
+                    status_str = f"{years_left}년 후 임금피크 도래자"
+                return status_str, peak_year, years_left
 
-        res = target_df.apply(lambda r: calc_peak_entry(r['출생연도'], peak_age), axis=1)
-        target_df['임피진입_상태'] = [r[0] for r in res]
-        target_df['임피진입_연도'] = [r[1] for r in res]
-        target_df['임피_남은년수'] = [r[2] for r in res]
+            res = target_df.apply(lambda r: calc_peak_entry(r['출생연도'], peak_age), axis=1)
+            target_df['임피진입_상태'] = [r[0] for r in res]
+            target_df['임피진입_연도'] = [r[1] for r in res]
+            target_df['임피_남은년수'] = [r[2] for r in res]
 
-        cal_summary = target_df.groupby(['임피진입_연도', '임피진입_상태']).agg(
-            인원수=('NO', 'count'),
-            추계액합계=('퇴직금추계액', 'sum'),
-            평균추계액=('퇴직금추계액', 'mean')
-        ).reset_index().sort_values(by='임피진입_연도')
+            cal_summary = target_df.groupby(['임피진입_연도', '임피진입_상태']).agg(
+                인원수=('NO', 'count'),
+                추계액합계=('퇴직금추계액', 'sum'),
+                평균추계액=('퇴직금추계액', 'mean')
+            ).reset_index().sort_values(by='임피진입_연도')
 
-        # [오류 수정] st.columns(2)로 2개 인자 명시
-        cal_col1, cal_col2 = st.columns(2)
-        
-        with cal_col1:
-            fig_cal = px.bar(
-                cal_summary, x='임피진입_연도', y='인원수',
-                color='임피진입_상태', text='인원수',
-                title=f"{selected_company} 임금피크 진입 연도별 인원 분포",
-                labels={'임피진입_연도': '진입 예정 연도', '인원수': '인원 수(명)'},
-                color_discrete_sequence=['#7A4016', '#0066B3', '#D97706', '#10B981', '#6B7280']
-            )
-            fig_cal.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff')
-            st.plotly_chart(fig_cal, use_container_width=True)
+            cal_col1, cal_col2 = st.columns(2)
+            
+            with cal_col1:
+                fig_cal = px.bar(
+                    cal_summary, x='임피진입_연도', y='인원수',
+                    color='임피진입_상태', text='인원수',
+                    title=f"{selected_company} 임금피크 진입 연도별 인원 분포",
+                    labels={'임피진입_연도': '진입 예정 연도', '인원수': '인원 수(명)'},
+                    color_discrete_sequence=['#7A4016', '#0066B3', '#D97706', '#10B981', '#6B7280']
+                )
+                fig_cal.update_layout(plot_bgcolor='#ffffff', paper_bgcolor='#ffffff')
+                st.plotly_chart(fig_cal, use_container_width=True)
 
-        with cal_col2:
-            st.markdown("#### 📌 시점별 도래 인원 및 추계액 합계표")
-            disp_cal = cal_summary.copy()
-            disp_cal['추계액합계'] = disp_cal['추계액합계'].apply(lambda x: f"₩{x/100000000:,.2f} 억원")
-            disp_cal['평균추계액'] = disp_cal['평균추계액'].apply(lambda x: f"₩{x/10000:,.0f} 만원")
-            disp_cal.rename(columns={
-                '임피진입_연도': '진입연도',
-                '임피진입_상태': '구분',
-                '인원수': '인원(명)',
-                '추계액합계': '합산 추계액',
-                '평균추계액': '평균 추계액'
+            with cal_col2:
+                st.markdown("#### 📌 시점별 도래 인원 및 추계액 합계표")
+                disp_cal = cal_summary.copy()
+                disp_cal['추계액합계'] = disp_cal['추계액합계'].apply(lambda x: f"₩{x/100000000:,.2f} 억원")
+                disp_cal['평균추계액'] = disp_cal['평균추계액'].apply(lambda x: f"₩{x/10000:,.0f} 만원")
+                disp_cal.rename(columns={
+                    '임피진입_연도': '진입연도',
+                    '임피진입_상태': '구분',
+                    '인원수': '인원(명)',
+                    '추계액합계': '합산 추계액',
+                    '평균추계액': '평균 추계액'
+                }, inplace=True)
+                st.dataframe(disp_cal[['진입연도', '구분', '인원(명)', '합산 추계액', '평균 추계액']], use_container_width=True, hide_index=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("---")
+
+            st.subheader(f"📋 2. 대상 구간(만 {target_min_age}세 ~ 만 {target_max_age}세) 가입자 상세 영업 명단")
+            st.caption("퇴직금 추계액 규모가 큰 순서대로 정렬된 1:1 영업 타깃 명단입니다. (마케팅/TM/SMS 동의 여부 포함)")
+
+            sorted_target_df = target_df.sort_values(by='퇴직금추계액', ascending=False).copy()
+            
+            display_df = sorted_target_df[[
+                'NO', '가입자명', '실명번호', '만나이', '입사일자', '중간정산일자', 
+                '임피진입_상태', '퇴직금추계액', '평균임금', 
+                '마케팅동의', 'TM동의', 'SMS동의'
+            ]].copy()
+
+            display_df.rename(columns={
+                '만나이': '만 나이',
+                '임피진입_상태': '임피 진입시점 상태',
+                '퇴직금추계액': '퇴직금 추계액(원)',
+                '평균임금': '평균임금(원)',
+                '마케팅동의': '마케팅 동의',
+                'TM동의': 'TM 동의',
+                'SMS동의': 'SMS 동의'
             }, inplace=True)
-            st.dataframe(disp_cal[['진입연도', '구분', '인원(명)', '합산 추계액', '평균 추계액']], use_container_width=True, hide_index=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("---")
-
-        # [지표 2 하단 명단]
-        st.subheader(f"📋 2. 대상 구간(만 {target_min_age}세 ~ 만 {target_max_age}세) 가입자 상세 영업 명단")
-        st.caption("퇴직금 추계액 규모가 큰 순서대로 정렬된 1:1 영업 타깃 명단입니다. (마케팅/TM/SMS 동의 여부 포함)")
-
-        sorted_target_df = target_df.sort_values(by='퇴직금추계액', ascending=False).copy()
-        
-        display_df = sorted_target_df[[
-            'NO', '가입자명', '실명번호', '만나이', '입사일자', '중간정산일자', 
-            '임피진입_상태', '퇴직금추계액', '평균임금', 
-            '마케팅동의', 'TM동의', 'SMS동의'
-        ]].copy()
-
-        display_df.rename(columns={
-            '만나이': '만 나이',
-            '임피진입_상태': '임피 진입시점 상태',
-            '퇴직금추계액': '퇴직금 추계액(원)',
-            '평균임금': '평균임금(원)',
-            '마케팅동의': '마케팅 동의',
-            'TM동의': 'TM 동의',
-            'SMS동의': 'SMS 동의'
-        }, inplace=True)
-
-        st.dataframe(
-            display_df.style.format({
-                '퇴직금 추계액(원)': '₩{:,.0f}',
-                '평균임금(원)': '₩{:,.0f}'
-            }),
-            use_container_width=True,
-            height=450,
-            hide_index=True
-        )
+            st.dataframe(
+                display_df.style.format({
+                    '퇴직금 추계액(원)': '₩{:,.0f}',
+                    '평균임금(원)': '₩{:,.0f}'
+                }),
+                use_container_width=True,
+                height=450,
+                hide_index=True
+            )
 
 # =============================================================================
 # 페이지 2: 전체 50개사 우선 영업 Target 순위 요약
@@ -451,6 +492,8 @@ elif main_menu == "2. 전체 50개사 우선 영업 Target 순위 요약":
         sorted_sum_df = all_sum_df.sort_values(by=sort_col, ascending=False).reset_index(drop=True)
         sorted_sum_df['순위'] = sorted_sum_df.index + 1
 
+        st.markdown(f"#### 📊 영업 Target 순위 Top 10 ({title_suffix1
+
         st.markdown(f"#### 📊 영업 Target 순위 Top 10 ({title_suffix})")
         top10_df = sorted_sum_df.head(10).copy()
         
@@ -494,6 +537,3 @@ elif main_menu == "2. 전체 50개사 우선 영업 Target 순위 요약":
                 '4. 대상구간 가입자비중(%)': '{:.1f}%'
             }),
             use_container_width=True,
-            height=600,
-            hide_index=True
-        )
