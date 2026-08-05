@@ -126,7 +126,7 @@ def get_company_list():
 COMPANY_LIST = get_company_list()
 
 # -----------------------------------------------------------------------------
-# 3. 데이터 로딩 및 파싱 함수 (캐싱 적용)
+# 3. 데이터 로딩 및 파싱 함수 (주민번호 성별코드 파싱 오류 수정)
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=3600)
 def load_company_data(company_name):
@@ -150,19 +150,21 @@ def load_company_data(company_name):
     if df is None:
         return None
 
+    # 임금피크 연령 파싱 (Z2 셀)
     peak_age_val = df.iloc[0]['임금피크 연령'] if '임금피크 연령' in df.columns else "만 55세"
     try:
         peak_age = int(str(peak_age_val).replace("만 ", "").replace("세", "").strip())
     except:
         peak_age = 55
         
+    # [오류 수정] 주민등록번호 성별 코드를 정확히 하이픈 뒤 첫 번째 자리에서 추출
     def parse_rrn(rrn_val):
         rrn_str = str(rrn_val).strip()
         yy = int(rrn_str[:2])
         if '-' in rrn_str:
-            g = rrn_str.split('-')[0]
+            g = rrn_str.split('-')[0]  # 하이픈 뒤 첫 번째 자리가 성별코드 (1, 2, 3, 4)
         else:
-            g = rrn_str[6] if len(rrn_str) > 6 else '1'
+            g = rrn_str if len(rrn_str) > 6 else '1'
             
         birth_year = (1900 + yy) if g in ['1', '2'] else (2000 + yy)
         age_2026 = 2026 - birth_year
@@ -231,7 +233,7 @@ if main_menu == "1. 개별 기업 상세 분석":
         target_min_age = peak_age - 2
         target_max_age = 59
         
-        # 한국투자증권 전용 상단 헤더 (우측 상단 Korea Investment 브랜드 로고)
+        # 한국투자증권 전용 상단 헤더
         st.markdown(f"""
         <div class="header-container">
             <div>
@@ -330,7 +332,8 @@ if main_menu == "1. 개별 기업 상세 분석":
             평균추계액=('퇴직금추계액', 'mean')
         ).reset_index().sort_values(by='임피진입_연도')
 
-        cal_col1, cal_col2 = st.columns()
+        # [오류 수정] st.columns(2)로 2개 인자 명시
+        cal_col1, cal_col2 = st.columns(2)
         
         with cal_col1:
             fig_cal = px.bar(
